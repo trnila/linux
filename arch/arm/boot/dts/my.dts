@@ -1,0 +1,21 @@
+#include "bcm2709-rpi-2-b.dts"
+
+/ {
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		baremetal {
+			reg = <0x30000000 0x8000000>;
+		};
+
+		mailbox@7e00b880 {
+			compatible = "brcm,bcm2835-mbox";
+			#mbox-cells = <0x0>;
+			interrupts = <0x0 0x1>;
+			phandle = <0x14>;
+			reg = <0x7e00b880 0x40>;
+		};
+	};
+};
