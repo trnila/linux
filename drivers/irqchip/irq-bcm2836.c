@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 
+#define DEBUG 1
 #include <linux/cpu.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
@@ -82,7 +83,6 @@ struct bcm2836_arm_irqchip_intc {
 };
 
 static struct bcm2836_arm_irqchip_intc intc  __read_mostly;
-
 static void bcm2836_arm_irqchip_mask_per_cpu_irq(unsigned int reg_offset,
 						 unsigned int bit,
 						 int cpu)
@@ -145,6 +145,26 @@ static void bcm2836_arm_irqchip_unmask_gpu_irq(struct irq_data *d)
 {
 }
 
+static void bcm2836_arm_irqchip_mask_mbox_irq(struct irq_data *d)
+{
+	printk("masking mbox irq");
+//	writel(0x0, 0x40000058);
+//	writel(1 << smp_processor_id(), intc.base + LOCAL_PM_ROUTING_CLR);
+}
+
+static void bcm2836_arm_irqchip_unmask_mbox_irq(struct irq_data *d)
+{
+	printk("unmasking mbox irq");
+//	writel(0x4, 0x40000058);
+//	writel(1 << smp_processor_id(), intc.base + LOCAL_PM_ROUTING_SET);
+}
+
+static struct irq_chip bcm2836_arm_irqchip_mbox = {
+	.name		= "bcm2836-mbox",
+	.irq_mask	= bcm2836_arm_irqchip_mask_mbox_irq,
+	.irq_unmask	= bcm2836_arm_irqchip_unmask_mbox_irq,
+};
+
 #ifdef CONFIG_ARM64
 
 void bcm2836_arm_irqchip_spin_gpu_irq(void)
@@ -188,6 +208,13 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 	u32 stat;
 
 	stat = readl_relaxed(intc.base + LOCAL_IRQ_PENDING0 + 4 * cpu);
+	if (stat & BIT(LOCAL_IRQ_MAILBOX2)) {
+		int val = readl(intc.base + 0xE8);
+		writel(0xffffffff, intc.base + 0xE8); // ack mailbox
+		printk("local_irq_mailbox 2 trigger %d\n", val);	
+		stat &= ~BIT(LOCAL_IRQ_MAILBOX2);
+	}
+	
 	if (stat & BIT(LOCAL_IRQ_MAILBOX0)) {
 #ifdef CONFIG_SMP
 		void __iomem *mailbox0 = (intc.base +
@@ -331,6 +358,9 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 					 &bcm2836_arm_irqchip_gpu);
 	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_PMU_FAST,
 					 &bcm2836_arm_irqchip_pmu);
+	// mailboxes
+	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_MAILBOX2,
+					 &bcm2836_arm_irqchip_mbox);
 
 	bcm2836_arm_irqchip_smp_init();
 
