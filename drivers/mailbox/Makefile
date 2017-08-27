@@ -20,6 +20,8 @@ obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
 
 obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
 
+obj-$(CONFIG_BCM2836_MBOX)	+= bcm2836-mailbox.o
+
 obj-$(CONFIG_STI_MBOX)		+= mailbox-sti.o
 
 obj-$(CONFIG_TI_MESSAGE_MANAGER) += ti-msgmgr.o

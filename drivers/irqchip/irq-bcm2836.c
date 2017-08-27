@@ -147,14 +147,14 @@ static void bcm2836_arm_irqchip_unmask_gpu_irq(struct irq_data *d)
 
 static void bcm2836_arm_irqchip_mask_mbox_irq(struct irq_data *d)
 {
-	printk("masking mbox irq");
+	printk("masking mbox irq %d\n", smp_processor_id());
 //	writel(0x0, 0x40000058);
 //	writel(1 << smp_processor_id(), intc.base + LOCAL_PM_ROUTING_CLR);
 }
 
 static void bcm2836_arm_irqchip_unmask_mbox_irq(struct irq_data *d)
 {
-	printk("unmasking mbox irq");
+	printk("unmasking mbox irq %d\n", smp_processor_id());
 //	writel(0x4, 0x40000058);
 //	writel(1 << smp_processor_id(), intc.base + LOCAL_PM_ROUTING_SET);
 }
@@ -210,9 +210,12 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 	stat = readl_relaxed(intc.base + LOCAL_IRQ_PENDING0 + 4 * cpu);
 	if (stat & BIT(LOCAL_IRQ_MAILBOX2)) {
 		int val = readl(intc.base + 0xE8);
+		printk("====================local_irq_mailbox 2 triggering\n");
+		handle_domain_irq(intc.domain, LOCAL_IRQ_MAILBOX2, regs);
 		writel(0xffffffff, intc.base + 0xE8); // ack mailbox
-		printk("local_irq_mailbox 2 trigger %d\n", val);	
-		stat &= ~BIT(LOCAL_IRQ_MAILBOX2);
+		printk("====================local_irq_mailbox 2 trigged %d\n", val);	
+	//	stat &= ~BIT(LOCAL_IRQ_MAILBOX2);
+		return;
 	}
 	
 	if (stat & BIT(LOCAL_IRQ_MAILBOX0)) {
@@ -329,6 +332,11 @@ static void bcm2835_init_local_timer_frequency(void)
 	writel(0x80000000, intc.base + LOCAL_PRESCALER);
 }
 
+unsigned int bcm2836_read(int offset) {
+	return readl(intc.base + offset);
+}
+EXPORT_SYMBOL(bcm2836_read);
+
 static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 						      struct device_node *parent)
 {
@@ -337,6 +345,7 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 		panic("%s: unable to map local interrupt registers\n",
 			node->full_name);
 	}
+	printk("MEM: %p\n", intc.base);
 
 	bcm2835_init_local_timer_frequency();
 
@@ -358,13 +367,21 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 					 &bcm2836_arm_irqchip_gpu);
 	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_PMU_FAST,
 					 &bcm2836_arm_irqchip_pmu);
+
+	printk("initializing my bcm");
 	// mailboxes
-	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_MAILBOX2,
-					 &bcm2836_arm_irqchip_mbox);
+	int irq = irq_create_mapping(intc.domain, LOCAL_IRQ_MAILBOX2);
+//	irq_set_percpu_devid(irq);
+	irq_set_probe(irq);
+	irq_set_chip_and_handler(irq, &bcm2836_arm_irqchip_mbox, handle_percpu_devid_irq);
+//	irq_set_status_flags(irq, IRQ_TYPE_LEVEL_LOW);
+//	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_MAILBOX2,
+//					 &bcm2836_arm_irqchip_mbox);
 
 	bcm2836_arm_irqchip_smp_init();
 
 	set_handle_irq(bcm2836_arm_irqchip_handle_irq);
+	printk("==============irq setup finished\n");
 	return 0;
 }
 
