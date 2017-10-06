@@ -226,7 +226,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 		if(hwirq == LOCAL_IRQ_MAILBOX2) {
 		    //int val = readl(intc.base + 0xE8);
 		    printk("====================local_irq_mailbox 2 triggering %d\n");
-		    writel(0xffffffff, intc.base + 0xE8);
+		    //writel(0xffffffff, intc.base + 0xE8);
 		}
 
 		handle_domain_irq(intc.domain, hwirq, regs);
@@ -367,7 +367,7 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 	// mailboxes
 	int irq = irq_create_mapping(intc.domain, LOCAL_IRQ_MAILBOX2);
 	irq_set_probe(irq);
-	irq_set_chip_and_handler(irq, &bcm2836_arm_irqchip_mbox, handle_percpu_irq);
+	irq_set_chip_and_handler(irq, &bcm2836_arm_irqchip_mbox, handle_level_irq);
 	irq_set_status_flags(irq, IRQ_TYPE_LEVEL_LOW);
 
 	bcm2836_arm_irqchip_smp_init();
