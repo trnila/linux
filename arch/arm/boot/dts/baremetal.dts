@@ -12,22 +12,66 @@
 		};
 	};
 
-	soc {
-		baremetal-mailbox@40000000 {
-			compatible = "baremetal-mailbox";
-			#mbox-cells = <0x0>;
-			interrupt-parent = <&local_intc>;
-			interrupts = <6>;
-			phandle = <0x100>;
-			reg = <0x40000000 0x100>; // still not working
-		};
+    user_io@0 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <10>;
+    };
 
-	};
+    user_io@1 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <11>;
+    };
 
-	user_io@0 {
-      compatible = "mydevice,generic-uio,ui_pdrv";
-      status = "okay";
-      interrupt-parent = <&local_intc>;
-      			interrupts = <6>;
-      };
+    user_io@2 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <12>;
+    };
+
+    user_io@3 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <13>;
+    };
+
+    user_io@4 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <14>;
+    };
+
+    user_io@5 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <15>;
+    };
+
+    user_io@6 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <16>;
+    };
+
+    user_io@7 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <17>;
+    };
+
+    user_io@8 {
+        compatible = "mailbox,generic-uio,ui_pdrv";
+        status = "okay";
+        interrupt-parent = <&local_intc>;
+        interrupts = <18>;
+    };
 };
