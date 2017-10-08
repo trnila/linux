@@ -75,7 +75,24 @@
 #define LOCAL_IRQ_MAILBOX3	7
 #define LOCAL_IRQ_GPU_FAST	8
 #define LOCAL_IRQ_PMU_FAST	9
-#define LAST_IRQ		LOCAL_IRQ_PMU_FAST
+
+#define LOCAL_IRQ_CORE0_MAILBOX1 10
+#define LOCAL_IRQ_CORE0_MAILBOX2 11
+#define LOCAL_IRQ_CORE0_MAILBOX3 12
+
+#define LOCAL_IRQ_CORE1_MAILBOX1 13
+#define LOCAL_IRQ_CORE1_MAILBOX2 14
+#define LOCAL_IRQ_CORE1_MAILBOX3 15
+
+#define LOCAL_IRQ_CORE2_MAILBOX1 16
+#define LOCAL_IRQ_CORE2_MAILBOX2 17
+#define LOCAL_IRQ_CORE2_MAILBOX3 18
+
+#define LOCAL_IRQ_CORE3_MAILBOX1 19
+#define LOCAL_IRQ_CORE3_MAILBOX2 20
+#define LOCAL_IRQ_CORE3_MAILBOX3 21
+
+#define LAST_IRQ		LOCAL_IRQ_CORE3_MAILBOX3
 
 struct bcm2836_arm_irqchip_intc {
 	struct irq_domain *domain;
@@ -147,17 +164,26 @@ static void bcm2836_arm_irqchip_unmask_gpu_irq(struct irq_data *d)
 
 static void bcm2836_arm_irqchip_mask_mbox_irq(struct irq_data *d)
 {
-	//printk("masking mbox irq %d\n", smp_processor_id());
-	// 1 -> enable 0 mailbox only
-	writel(0x1, intc.base + 0x58);
+	int cpu = (d->hwirq - LOCAL_IRQ_CORE0_MAILBOX1) / 3;
+	int mailbox = (d->hwirq - LOCAL_IRQ_CORE0_MAILBOX1) % 3 + 1;
+
+	bcm2836_arm_irqchip_mask_per_cpu_irq(
+	    LOCAL_MAILBOX_INT_CONTROL0,
+	    mailbox,
+		cpu
+	);
 }
 
 static void bcm2836_arm_irqchip_unmask_mbox_irq(struct irq_data *d)
 {
-	//printk("unmasking mbox irq %d\n", smp_processor_id());
-    // 1 -> enable 0 mailbox
-    // 4 -> enable 2 mailbox
-	writel(0x5, intc.base + 0x58);
+	int cpu = (d->hwirq - LOCAL_IRQ_CORE0_MAILBOX1) / 3;
+	int mailbox = (d->hwirq - LOCAL_IRQ_CORE0_MAILBOX1) % 3 + 1;
+
+	bcm2836_arm_irqchip_unmask_per_cpu_irq(
+	    LOCAL_MAILBOX_INT_CONTROL0,
+	    mailbox,
+		cpu
+	);
 }
 
 static struct irq_chip bcm2836_arm_irqchip_mbox = {
@@ -165,6 +191,14 @@ static struct irq_chip bcm2836_arm_irqchip_mbox = {
 	.irq_mask	= bcm2836_arm_irqchip_mask_mbox_irq,
 	.irq_unmask	= bcm2836_arm_irqchip_unmask_mbox_irq,
 };
+
+static void bcm2836_arm_irqchip_register_mailbox_irq(int hwirq)
+{
+	int irq = irq_create_mapping(intc.domain, hwirq);
+	irq_set_probe(irq);
+	irq_set_chip_and_handler(irq, &bcm2836_arm_irqchip_mbox, handle_level_irq);
+	irq_set_status_flags(irq, IRQ_TYPE_LEVEL_LOW);
+}
 
 #ifdef CONFIG_ARM64
 
@@ -223,10 +257,9 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 	} else if (stat) {
 		u32 hwirq = ffs(stat) - 1;
 
-		if(hwirq == LOCAL_IRQ_MAILBOX2) {
-		    //int val = readl(intc.base + 0xE8);
-		    printk("====================local_irq_mailbox 2 triggering %d\n");
-		    //writel(0xffffffff, intc.base + 0xE8);
+		// map hwirq to mailbox-on-core irq
+		if(hwirq >= LOCAL_IRQ_MAILBOX0 && hwirq <= LOCAL_IRQ_MAILBOX3) {
+			hwirq = smp_processor_id() * 3 + hwirq - LOCAL_IRQ_MAILBOX0 + LOCAL_IRQ_CORE0_MAILBOX1 - 1;
 		}
 
 		handle_domain_irq(intc.domain, hwirq, regs);
@@ -329,10 +362,13 @@ static void bcm2835_init_local_timer_frequency(void)
 	writel(0x80000000, intc.base + LOCAL_PRESCALER);
 }
 
-unsigned int bcm2836_read(int offset) {
-	return readl(intc.base + offset);
+static void bcm2836_arm_irqchip_init_mailboxes(void)
+{
+	int i;
+    for(i = LOCAL_IRQ_CORE0_MAILBOX1; i <= LOCAL_IRQ_CORE3_MAILBOX3; i++) {
+	    bcm2836_arm_irqchip_register_mailbox_irq(i);
+	}
 }
-EXPORT_SYMBOL(bcm2836_read);
 
 static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 						      struct device_node *parent)
@@ -364,12 +400,7 @@ static int __init bcm2836_arm_irqchip_l1_intc_of_init(struct device_node *node,
 	bcm2836_arm_irqchip_register_irq(LOCAL_IRQ_PMU_FAST,
 					 &bcm2836_arm_irqchip_pmu);
 
-	// mailboxes
-	int irq = irq_create_mapping(intc.domain, LOCAL_IRQ_MAILBOX2);
-	irq_set_probe(irq);
-	irq_set_chip_and_handler(irq, &bcm2836_arm_irqchip_mbox, handle_level_irq);
-	irq_set_status_flags(irq, IRQ_TYPE_LEVEL_LOW);
-
+	bcm2836_arm_irqchip_init_mailboxes();
 	bcm2836_arm_irqchip_smp_init();
 
 	set_handle_irq(bcm2836_arm_irqchip_handle_irq);
